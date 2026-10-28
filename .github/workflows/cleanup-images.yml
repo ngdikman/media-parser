@@ -25,4 +25,6 @@ jobs:
           package-name: ${{ env.IMAGE_NAME }}
           package-type: container
           min-versions-to-keep: 1
-          token: ${{ secrets.PACKAGES_TOKEN }}
+          # 配了 PACKAGES_TOKEN（classic PAT，含 read:packages + delete:packages）就优先用，
+          # 否则回退到内置 GITHUB_TOKEN（要求仓库在包的 Manage Actions Access 里有 Admin 角色）
+          token: ${{ secrets.PACKAGES_TOKEN || github.token }}
