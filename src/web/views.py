@@ -1,4 +1,5 @@
 from flask import Blueprint, redirect, render_template, session, url_for
+from configs.general_constants import DOMAIN_TO_NAME
 from src.db import get_db, setting
 
 bp = Blueprint('web', __name__)
@@ -19,9 +20,20 @@ def index():
 
     api_enabled = setting('global_api_enabled', '1') == '1'
     demo_enabled = setting('demo_enabled', '1') == '1'
+
+    # 支持的平台列表（按域名配置去重），并标记后台已暂停的平台
+    platforms = sorted(set(DOMAIN_TO_NAME.values()))
+    disabled_platforms = {
+        row['platform']
+        for row in get_db().execute("SELECT platform, enabled FROM platform_settings")
+        if not row['enabled']
+    }
+
     return render_template(
         'landing.html',
         api_enabled=api_enabled,
         demo_enabled=demo_enabled,
         parser_enabled=api_enabled and demo_enabled,
+        platforms=platforms,
+        disabled_platforms=disabled_platforms,
     )

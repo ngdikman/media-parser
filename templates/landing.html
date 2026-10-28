@@ -21,7 +21,7 @@
     <header class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div class="max-w-7xl mx-auto min-h-16 px-5 sm:px-8 py-3 flex items-center justify-between gap-4">
             <a href="#top" class="flex items-center gap-3 shrink-0" aria-label="Media Parser 首页"><img src="{{ url_for('static', filename='images/logo-web.png') }}" alt="" class="w-9 h-9 rounded-xl border border-slate-200 bg-white p-1"><span class="hidden sm:inline font-bold tracking-tight text-slate-950">Media Parser <span class="text-brand">API</span></span></a>
-            <nav class="hidden lg:flex items-center gap-8 text-sm text-slate-600"><a href="#parser" class="hover:text-brand">在线解析</a><a href="#capabilities" class="hover:text-brand">平台能力</a><a href="#deployment" class="hover:text-brand">部署方式</a><a href="#docs" class="hover:text-brand">接入示例</a><a href="#faq" class="hover:text-brand">常见问题</a></nav>
+            <nav class="hidden lg:flex items-center gap-8 text-sm text-slate-600"><a href="#parser" class="hover:text-brand">在线解析</a><a href="#capabilities" class="hover:text-brand">平台能力</a><a href="#platforms" class="hover:text-brand">支持平台</a><a href="#deployment" class="hover:text-brand">部署方式</a><a href="#docs" class="hover:text-brand">接入示例</a><a href="#faq" class="hover:text-brand">常见问题</a></nav>
             <div class="flex items-center gap-2 sm:gap-3">
                 <a href="https://github.com/ucmao/media-parser" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 Media Parser 源码" title="GitHub 开源仓库" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm">
                     <svg viewBox="0 0 24 24" aria-hidden="true" class="w-4 h-4 fill-slate-900"><path d="M12 .7a11.5 11.5 0 0 0-3.64 22.4c.58.1.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.17.08 1.78 1.2 1.78 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.74-1.55-2.57-.3-5.27-1.29-5.27-5.69 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.16 1.18a10.9 10.9 0 0 1 5.76 0c2.2-1.49 3.16-1.18 3.16-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.42-2.71 5.39-5.29 5.68.42.36.79 1.07.79 2.16v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z"/></svg>
@@ -224,6 +224,73 @@
 
         <section id="capabilities" class="max-w-7xl mx-auto px-5 sm:px-8 py-20"><div class="grid lg:grid-cols-[.7fr_1.3fr] gap-12 items-start"><div class="lg:sticky lg:top-28"><p class="font-mono text-sm font-semibold text-brand">ONE ENDPOINT</p><h2 class="mt-3 text-3xl sm:text-4xl font-bold text-slate-950">面向真实业务的解析能力</h2><p class="mt-4 text-slate-600 leading-7">解析器按平台独立维护，对外保持一致的数据结构。后台可随时关闭异常平台，不影响其他接口。</p></div><div class="grid sm:grid-cols-2 gap-4">
             {% for number,title,description in [('01','多类型媒体','统一获取视频、图集、Live Photo、背景音频、封面及字幕。'),('02','密钥与限流','每位客户独立管理 API Key，支持用户级、密钥级和平台级 QPS。'),('03','状态可控制','管理员可控制全局服务和单个平台，并配置客户有效期。'),('04','调用可追踪','记录平台、响应状态、错误码和耗时，快速定位解析异常。')] %}<article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div class="text-brand font-mono font-semibold">{{ number }}</div><h3 class="mt-8 text-xl font-bold text-slate-950">{{ title }}</h3><p class="mt-3 text-slate-600 leading-7">{{ description }}</p></article>{% endfor %}
+        </section>
+
+        <!-- 支持平台 -->
+        {% set platform_groups = [
+            ('users', '短视频与社交', '短视频、社交动态与图文分享', ['抖音', '快手', '小红书', '微博', '视频号', '微视', '最右', '皮皮虾', '皮皮搞笑', '美拍', '梨视频', 'Soul', '绿洲', '松果时刻']),
+            ('video', '长视频与内容社区', '影视综艺、资讯与内容社区', ['哔哩哔哩', '西瓜视频', '好看视频', 'AcFun', '新片场', '央视', '央视频', '虎牙', '今日头条', '微信公众号', '知乎', '网易LOFTER']),
+            ('music', '音乐与听书', '音乐、音频与有声小说', ['网易云音乐', 'QQ音乐', '酷狗音乐', '汽水音乐', '全民K歌', '配音秀', '番茄小说', '红果短剧', '红果漫剧']),
+            ('lightbulb', 'AI 与创作工具', 'AI 生成内容与视频创作工具', ['豆包', '即梦AI', '可灵AI', '海螺AI', '星绘AI', '夸克AI', '小云雀AI', '通义千问', '腾讯元宝', '剪映', '快影']),
+            ('tag', '电商与生活', '商品、二手交易与生活服务', ['得物', '闲鱼', '拼多多', '腾讯频道'])
+        ] %}
+        {% set known_platforms = platform_groups | map(attribute=3) | sum(start=[]) %}
+        {% set other_platforms = platforms | reject('in', known_platforms) | list %}
+        <section id="platforms" class="border-t border-slate-200 bg-slate-50/80">
+            <div class="max-w-7xl mx-auto px-5 sm:px-8 py-20">
+                <div class="max-w-2xl">
+                    <p class="font-mono text-sm font-semibold text-brand">SUPPORTED PLATFORMS</p>
+                    <h2 class="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-slate-950">已支持 50+ 个内容平台</h2>
+                    <p class="mt-4 text-slate-600 leading-7">覆盖短视频、长视频、音乐听书、AI 生成与电商生活等场景，在线解析与 API 调用共用同一套解析能力。</p>
+                </div>
+                <div class="mt-10 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {% for icon_name, group_title, group_desc, group_names in platform_groups %}
+                    {% set items = group_names | select('in', platforms) | list %}
+                    {% if items %}
+                    <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-brand">{{ icon(icon_name, 'w-4 h-4') }}</span>
+                                <h3 class="text-base font-bold text-slate-950 truncate">{{ group_title }}</h3>
+                            </div>
+                            <span class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-500">{{ items|length }}</span>
+                        </div>
+                        <p class="mt-2 text-xs text-slate-500">{{ group_desc }}</p>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            {% for name in items %}
+                            <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition {% if name in disabled_platforms %}border-slate-200 bg-slate-100 text-slate-400{% else %}border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-200 hover:bg-white hover:text-brand{% endif %}"{% if name in disabled_platforms %} title="该平台解析服务维护中"{% endif %}>{% if name in disabled_platforms %}<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{% endif %}{{ name }}</span>
+                            {% endfor %}
+                        </div>
+                    </article>
+                    {% endif %}
+                    {% endfor %}
+                    <div class="flex flex-col rounded-2xl border border-dashed border-slate-200 bg-slate-100/60 p-6">
+                        <div class="flex items-center gap-3">
+                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200/70 text-slate-400">{{ icon('link', 'w-4 h-4') }}</span>
+                            <h3 class="text-base font-bold text-slate-500">更多平台持续接入...</h3>
+                        </div>
+                        <p class="mt-2 text-xs text-slate-400">更多平台正在持续适配中，敬请期待</p>
+                    </div>
+                    {% if other_platforms %}
+                    <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-brand">{{ icon('globe', 'w-4 h-4') }}</span>
+                                <h3 class="text-base font-bold text-slate-950 truncate">其他平台</h3>
+                            </div>
+                            <span class="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-semibold text-slate-500">{{ other_platforms|length }}</span>
+                        </div>
+                        <p class="mt-2 text-xs text-slate-500">未归类的解析能力</p>
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            {% for name in other_platforms %}
+                            <span class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition {% if name in disabled_platforms %}border-slate-200 bg-slate-100 text-slate-400{% else %}border-slate-200 bg-slate-50 text-slate-600 hover:border-indigo-200 hover:bg-white hover:text-brand{% endif %}"{% if name in disabled_platforms %} title="该平台解析服务维护中"{% endif %}>{% if name in disabled_platforms %}<span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>{% endif %}{{ name }}</span>
+                            {% endfor %}
+                        </div>
+                    </article>
+                    {% endif %}
+                </div>
+                <p class="mt-6 flex items-center gap-1.5 text-xs text-slate-500">{{ icon('info', 'w-3.5 h-3.5 text-slate-400') }}带黄色圆点的平台表示暂时处于维护状态</p>
+            </div>
         </section>
 
         <!-- 开源使用与部署方式 -->
@@ -1029,7 +1096,7 @@
                 return {
                     title: '暂未支持该平台',
                     message: '当前尚未支持提取该平台的内容，平台能力会持续更新完善。',
-                    hint: '支持的平台列表可查阅下方“平台能力”板块。',
+                    hint: '支持的平台列表可查阅下方“支持平台”板块。',
                     tag: '平台支持'
                 };
             }
