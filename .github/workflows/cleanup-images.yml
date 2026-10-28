@@ -1,7 +1,9 @@
 name: Cleanup image versions
 
-# 手动执行：只保留 package 中最新的一个镜像版本，其余全部删除
 on:
+  schedule:
+    # UTC 周日 03:00 = 北京时间周日 11:00
+    - cron: '0 3 * * 0'
   workflow_dispatch:
 
 concurrency:
@@ -12,44 +14,15 @@ env:
   IMAGE_NAME: media-parser
 
 jobs:
-  prune:
+  cleanup:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - name: Keep newest version, delete the rest
-        env:
-          GH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::缺少 secrets.PACKAGES_TOKEN，需要带 read:packages + delete:packages 权限的 PAT"
-            exit 1
-          fi
-
-          OWNER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
-          PKG="${IMAGE_NAME}"
-          ENDPOINT="/users/${OWNER}/packages/container/${PKG}/versions"
-
-          # 拉取全部分页并合并成一个数组
-          versions=$(gh api --paginate --slurp "${ENDPOINT}" | jq 'add // []')
-          total=$(echo "${versions}" | jq 'length')
-          echo "共 ${total} 个版本"
-
-          if [ "${total}" -le 1 ]; then
-            echo "版本数不足 2 个，无需清理"
-            exit 0
-          fi
-
-          keep=$(echo "${versions}" | jq -r 'sort_by(.created_at) | last | .id')
-          keep_tags=$(echo "${versions}" | jq -r --argjson id "${keep}" '.[] | select(.id == $id) | .metadata.container.tags | join(",")')
-          echo "保留版本 id=${keep} created=$(echo "${versions}" | jq -r --argjson id "${keep}" '.[] | select(.id == $id) | .created_at') tags=${keep_tags}"
-
-          echo "${versions}" \
-            | jq -r --argjson id "${keep}" '.[] | select(.id != $id) | "\(.id)\t\(.created_at)\t\(.metadata.container.tags | join(","))"' \
-            | while IFS=$'\t' read -r id created tags; do
-                echo "删除版本 id=${id} created=${created} tags=${tags}"
-                gh api -X DELETE "/users/${OWNER}/packages/container/${PKG}/versions/${id}"
-              done
-
-          remaining=$(gh api --paginate --slurp "${ENDPOINT}" | jq 'add | length')
-          echo "清理完成，剩余 ${remaining} 个版本"
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ env.IMAGE_NAME }}
+          package-type: container
+          min-versions-to-keep: 1
+          token: ${{ secrets.PACKAGES_TOKEN }}
