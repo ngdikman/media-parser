@@ -19,7 +19,7 @@
   * 网页探索长链：`https://www.xiaohongshu.com/explore/6a8fbccc000000002a03825a`
 * **Cookie 依赖**：
   * **建议配置**：小红书针对高频/服务器 IP 匿名抓取会频繁发起风控并 302 重定向至 `/login` 登录页。
-  * **配置方式**：在 `.env` 或 Docker 环境中配置 `XHS_COOKIE="a1=...; webId=...; web_session=..."`。
+  * **配置方式**：在 `.env` 或 Docker 环境中配置 `XIAOHONGSHU_COOKIE="a1=...; webId=...; web_session=..."`。
   * **核心字段**：仅需包含设备凭据 `a1`、访客 `webId` 或登录凭证 `web_session`。配置后解析成功率可达 99%+。
 
 ---
@@ -112,6 +112,7 @@ if match:
 5. **缺少 `xsec_token` 触发平台 404 风控拦截 (错误码 300031)**：
    * *原因*：直接截断的笔记 URL 或部分旧短链若未包含 `xsec_token`，小红书安全网关会强制重定向至 `/404/sec_...`（“当前笔记暂时无法浏览”）。
    * *解法*：分享链接必须保留完整的 `xsec_token` 签名；重定向提取器完整保留来源签名参数。
+   * *错误码*：命中 `/404/sec_*`、`xhs_sec_server` 或 `error_code=300031` 时返回 `XIAOHONGSHU_COOKIE_REQUIRED`（会触发代理换 IP 重试），不再误报为 `MEDIA_DELETED_OR_PRIVATE`；实测携带 `xsec_token` 的公开笔记在被风控的出口 IP 上同样会落到该页。
 6. **已删除 / 私密笔记识别与错误码精准透传 (`MEDIA_DELETED_OR_PRIVATE`)**：
    * 当笔记被作者删除或设置为私密不可见时，小红书会返回 `404?source=note&noteId=...` 或 SSR 数据中 `noteDetailMap[firstNoteId]['note']` 为 `{}`。
    * API 层优先透传解析器的 `terminal_error`（状态码 `MEDIA_DELETED_OR_PRIVATE`），避免将已删除作品误报为 `XIAOHONGSHU_COOKIE_REQUIRED`。

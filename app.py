@@ -11,6 +11,7 @@ from src.web.portal import bp as portal_bp
 from src.web.admin import bp as admin_bp
 from src.db import init_app as init_database
 from src.utils.proxy_manager import ProxyManager
+from src.mailer import load_smtp_config
 from configs.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -45,9 +46,10 @@ def create_app(config=None):
     app.config['DATABASE'] = os.getenv(
         'DATABASE_PATH', os.path.join(app.instance_path, 'media_parser.db')
     )
-    proxy_url = (os.getenv('DYNAMIC_PROXY_API_URL') or os.getenv('JULIANG_PROXY_API_URL') or '').strip()
-    app.config['DYNAMIC_PROXY_API_URL'] = proxy_url
-    app.config['JULIANG_PROXY_API_URL'] = proxy_url
+    app.config['DYNAMIC_PROXY_API_URL'] = (os.getenv('DYNAMIC_PROXY_API_URL') or '').strip()
+    app.config['PROXY_MODE'] = (os.getenv('PROXY_MODE') or '').strip().lower()
+    app.config['PROXY_POOL_SIZE'] = (os.getenv('PROXY_POOL_SIZE') or '').strip()
+    app.config['PROXY_FETCH_PER_SECOND'] = (os.getenv('PROXY_FETCH_PER_SECOND') or '').strip()
     app.config['MAX_CONTENT_LENGTH'] = 32 * 1024
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['JSON_SORT_KEYS'] = False
@@ -57,6 +59,7 @@ def create_app(config=None):
     app.config['API_ONLY'] = os.getenv(
         'API_ONLY', ''
     ).strip().lower() in {'1', 'true', 'yes', 'on'}
+    app.config.update(load_smtp_config())
     if hasattr(app, 'json'):
         app.json.sort_keys = False
     if config:
@@ -68,7 +71,11 @@ def create_app(config=None):
     if not app.config.get('SECRET_KEY'):
         app.config['SECRET_KEY'] = _load_or_create_secret(database_dir or app.instance_path)
     init_database(app)
-    manager = ProxyManager(app.config["DATABASE"], app.config["DYNAMIC_PROXY_API_URL"])
+    manager = ProxyManager(
+        app.config["DATABASE"], app.config["DYNAMIC_PROXY_API_URL"],
+        mode=app.config.get("PROXY_MODE"), pool_size=app.config.get("PROXY_POOL_SIZE"),
+        fetch_per_second=app.config.get("PROXY_FETCH_PER_SECOND"),
+    )
     app.extensions["proxy_manager"] = manager
     if not app.testing:
         manager.start()

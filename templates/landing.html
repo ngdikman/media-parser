@@ -34,7 +34,10 @@
     <div class="fixed inset-0 grid-bg pointer-events-none"></div><div class="fixed -top-40 right-0 w-[620px] h-[620px] glow pointer-events-none"></div>
     <header class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div class="max-w-7xl mx-auto min-h-16 px-5 sm:px-8 py-3 flex items-center justify-between gap-4">
-            <a href="#top" class="flex items-center gap-3 shrink-0" aria-label="Media Parser 首页"><img src="{{ url_for('static', filename='images/logo-web.png') }}" alt="" class="w-9 h-9 rounded-xl border border-slate-200 bg-white p-1"><span class="hidden sm:inline font-bold tracking-tight text-slate-950">Media Parser <span class="text-brand">API</span></span></a>
+            <a href="#top" class="flex items-center gap-2.5 sm:gap-3 shrink-0" aria-label="Media Parser 首页">
+                <img src="{{ url_for('static', filename='images/logo-web.png') }}" alt="" class="w-9 h-9 rounded-xl border border-slate-200 bg-white p-1">
+                <span class="font-bold tracking-tight text-slate-950 text-sm sm:text-base">Media Parser <span class="text-brand">API</span></span>
+            </a>
             <nav class="hidden lg:flex items-center gap-8 text-sm text-slate-600"><a href="#parser" class="hover:text-brand">在线解析</a><a href="#capabilities" class="hover:text-brand">平台能力</a><a href="#platforms" class="hover:text-brand">支持平台</a><a href="#deployment" class="hover:text-brand">部署方式</a><a href="#docs" class="hover:text-brand">接入示例</a><a href="#faq" class="hover:text-brand">常见问题</a></nav>
             <div class="flex items-center gap-2 sm:gap-3">
                 <a href="https://github.com/ucmao/media-parser" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看 Media Parser 源码" title="GitHub 开源仓库" class="inline-flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm">
@@ -47,7 +50,32 @@
                         </span>
                     </span>
                 </a>
-                <a href="{{ url_for('auth.login') }}" class="hidden sm:inline text-sm font-medium text-slate-600 hover:text-brand">登录</a><a href="{{ url_for('auth.register') }}" class="rounded-lg bg-brand px-3 sm:px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 transition"><span class="sm:hidden">注册</span><span class="hidden sm:inline">创建账号</span></a>
+                <a href="{{ url_for('auth.login') }}" class="hidden sm:inline text-sm font-medium text-slate-600 hover:text-brand">登录</a>
+                <a href="{{ url_for('auth.register') }}" class="rounded-lg bg-brand px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold text-white hover:bg-indigo-700 transition"><span class="sm:hidden">注册</span><span class="hidden sm:inline">创建账号</span></a>
+                <!-- 移动端导航菜单开关按钮 -->
+                <button type="button" id="landingMobileMenuBtn" onclick="toggleLandingMobileMenu()" class="lg:hidden p-2 -mr-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition" aria-label="切换导航菜单">
+                    <svg id="menuIconOpen" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    <svg id="menuIconClose" class="w-5 h-5 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- 移动端展开导航菜单 (Mobile Dropdown Menu) -->
+        <div id="landingMobileMenu" class="hidden lg:hidden border-t border-slate-100 bg-white/95 backdrop-blur-xl px-5 py-4 space-y-3 shadow-lg">
+            <nav class="flex flex-col space-y-1 text-sm font-medium text-slate-700">
+                <a href="#parser" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">在线解析</a>
+                <a href="#capabilities" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">平台能力</a>
+                <a href="#platforms" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">支持平台</a>
+                <a href="#deployment" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">部署方式</a>
+                <a href="#docs" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">接入示例</a>
+                <a href="#faq" onclick="closeLandingMobileMenu()" class="px-3 py-2 rounded-lg hover:bg-slate-50 hover:text-brand transition">常见问题</a>
+            </nav>
+            <div class="pt-3 border-t border-slate-100 flex items-center gap-2.5">
+                <a href="{{ url_for('auth.login') }}" class="flex-1 text-center py-2 text-xs font-semibold text-slate-700 hover:text-brand bg-slate-50 hover:bg-slate-100 rounded-lg transition border border-slate-200">登录控制台</a>
+                <a href="{{ url_for('auth.register') }}" class="flex-1 text-center py-2 text-xs font-semibold text-white bg-brand hover:bg-indigo-700 rounded-lg transition shadow-xs">注册新账号</a>
             </div>
         </div>
     </header>
@@ -1124,12 +1152,36 @@
             }
 
             // 3. 作品自身状态（删除/私密/无媒体）
+            if (code === 'MEDIA_UNDER_REVIEW') {
+                return {
+                    title: '作品审核中',
+                    message: '该作品刚刚发布，平台仍在审核，暂时无法查看。',
+                    hint: '请等待几分钟，审核通过后再重新解析。',
+                    tag: '审核中'
+                };
+            }
             if (code === 'MEDIA_DELETED_OR_PRIVATE') {
                 return {
                     title: '作品不可查看',
                     message: '该内容可能已被原作者删除，或者属于仅自己/好友可见的私密作品。',
                     hint: '请确保该作品在对应平台为全网公开可见状态。',
                     tag: '作品状态'
+                };
+            }
+            if (code === 'ITEM_NOT_FOUND') {
+                return {
+                    title: '宝贝已下架或删除',
+                    message: '该闲鱼商品已被卖家删除或下架，无法获取宝贝详情。',
+                    hint: '请确认商品链接有效并在闲鱼客户端内处于在售状态。',
+                    tag: '商品下架'
+                };
+            }
+            if (code === 'WECHAT_MP_VERIFY_REQUIRED') {
+                return {
+                    title: '触发安全验证',
+                    message: '微信公众号访问触发了环境异常安全验证，暂时无法直接抓取页面。',
+                    hint: '建议稍候几分钟再试，或更换网络环境后重试。',
+                    tag: '安全验证'
                 };
             }
             if (code === 'NO_MEDIA_IN_CONTENT') {
@@ -1283,6 +1335,37 @@
     <script src="{{ url_for('static', filename='vendor/split-type.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='vendor/lenis.min.js') }}" defer></script>
     <script>
+        /* ---- 移动端导航菜单控制 ---- */
+        function toggleLandingMobileMenu() {
+            const menu = document.getElementById('landingMobileMenu');
+            const iconOpen = document.getElementById('menuIconOpen');
+            const iconClose = document.getElementById('menuIconClose');
+            if (!menu) return;
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                if (iconOpen) iconOpen.classList.add('hidden');
+                if (iconClose) iconClose.classList.remove('hidden');
+            } else {
+                menu.classList.add('hidden');
+                if (iconOpen) iconOpen.classList.remove('hidden');
+                if (iconClose) iconClose.classList.add('hidden');
+            }
+        }
+        function closeLandingMobileMenu() {
+            const menu = document.getElementById('landingMobileMenu');
+            const iconOpen = document.getElementById('menuIconOpen');
+            const iconClose = document.getElementById('menuIconClose');
+            if (menu) menu.classList.add('hidden');
+            if (iconOpen) iconOpen.classList.remove('hidden');
+            if (iconClose) iconClose.classList.add('hidden');
+        }
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                closeLandingMobileMenu();
+            }
+        });
+
         /* ---- 入场系统：IntersectionObserver + CSS 过渡，零 CDN 依赖 ---- */
         (function () {
             if (!document.documentElement.classList.contains('land-anim')) return;

@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS users (
     expires_at TEXT,
     qps_limit INTEGER NOT NULL DEFAULT 2,
     credits INTEGER NOT NULL DEFAULT 100,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    register_ip TEXT,
+    last_login_ip TEXT,
+    last_login_at TEXT
 );
 CREATE TABLE IF NOT EXISTS api_keys (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +51,8 @@ CREATE TABLE IF NOT EXISTS request_logs (
     error_code TEXT,
     duration_ms INTEGER NOT NULL,
     input_url TEXT,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    client_ip TEXT
 );
 CREATE TABLE IF NOT EXISTS cookie_probe_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,6 +70,16 @@ CREATE TABLE IF NOT EXISTS rate_limit_buckets (
     bucket_second INTEGER NOT NULL,
     count INTEGER NOT NULL,
     PRIMARY KEY(subject, bucket_second)
+);
+CREATE TABLE IF NOT EXISTS email_verification_codes (
+    email TEXT NOT NULL COLLATE NOCASE,
+    purpose TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    request_ip TEXT,
+    PRIMARY KEY(email, purpose)
 );
 CREATE INDEX IF NOT EXISTS idx_logs_created_at ON request_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_logs_user_id ON request_logs(user_id, created_at DESC);
@@ -109,11 +123,41 @@ def close_db(_error=None):
         db.close()
 
 
+# 旧库升级：CREATE TABLE IF NOT EXISTS 不会给已存在的表加列，这里按需补齐。
+_COLUMN_MIGRATIONS = {
+    "users": {
+        "register_ip": "TEXT",
+        "last_login_ip": "TEXT",
+        "last_login_at": "TEXT",
+        "email": "TEXT",
+    },
+    "request_logs": {
+        "client_ip": "TEXT",
+    },
+}
+
+
+def _migrate_columns(db):
+    for table, columns in _COLUMN_MIGRATIONS.items():
+        existing = {row[1] for row in db.execute(f"PRAGMA table_info({table})")}
+        for column, column_type in columns.items():
+            if column not in existing:
+                db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_users_register_ip ON users(register_ip)")
+    # 邮箱可为空（未配置 SMTP 时注册的账号没有邮箱），仅对已填写的邮箱做唯一约束
+    db.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email COLLATE NOCASE) "
+        "WHERE email IS NOT NULL"
+    )
+    db.execute("CREATE INDEX IF NOT EXISTS idx_logs_client_ip ON request_logs(client_ip, created_at DESC)")
+
+
 def init_db():
     db = get_db()
     db.execute("PRAGMA journal_mode = WAL")
     db.execute("PRAGMA synchronous = NORMAL")
     db.executescript(SCHEMA)
+    _migrate_columns(db)
     defaults = {
         "global_api_enabled": "1",
         "homepage_enabled": "1",
@@ -122,6 +166,8 @@ def init_db():
         "default_user_qps": "2",
         "default_trial_days": "365",
         "default_initial_credits": "100",
+        "registration_daily_limit": "30",
+        "email_verification_enabled": "1",
         "api_tip_enabled": "1",
         "api_tip_author": "ucmao",
         "api_tip_website": "https://github.com/ucmao/media-parser",

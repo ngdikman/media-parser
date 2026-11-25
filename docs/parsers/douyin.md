@@ -28,6 +28,11 @@
   * **普通视频与普通图文 (100% 免配)**：完全无需用户登录 Cookie。常规视频直连**移动端 Feed 核心通道**（免 Argus 门禁、免 Cookie、免签名、毫秒级直出）；普通图文自动通过分享页 SSR 提取高清原图。
   * **LivePhoto 实况照片 (`live_photo_url`)**：实况视频流仅由 PC Web 详情 API (`/aweme/v1/web/aweme/detail/`) 下发。在云服务器（机房 IP）下受字节跳动严格风控，需在 `.env` 中配置 `DOUYIN_COOKIE`，且必须包含完整登录 Cookie（含 `sessionid`, `sessionid_ss`, `passport_csrf_token`, `odin_tt` 等）以及 `UIFID` 字段。解析器会自动计算 `x-secsdk-web-signature` 签名并注入 `uifid` 请求头，完美穿透网关阻断；若未配置或遭遇不可抗力风控，自动保底降级为全量静态无水印原图。
   * **放映厅长片 (`/lvdetail/`)**：受字节跳动严格风控保护，可在 `.env` 中配置人机滑块通行证 `DOUYIN_COOKIE="s_v_web_id=verify_..."`（代码已做路由隔离，常规作品会自动剔除过期验证码）。
+* **环境变量控制**：
+  * `DOUYIN_COOKIE`：实况 LivePhoto 视频流或特定风控页面所需的登录凭据与 UIFID。
+  * `DOUYIN_ENABLE_MOBILE_FEED`：是否启用移动端 Feed 核心通道免风控直出（默认 `1` 启用）。
+  * `DOUYIN_UNDER_REVIEW_MAX_AGE`：刚发布作品审核中状态判别窗口（秒，默认 `7200` 即 2 小时；处于该窗口内返回 `status_self_see` 视作 `MEDIA_UNDER_REVIEW` 审核中）。
+  * `DOUYIN_API_MAX_ATTEMPTS`：Web 详情接口重试上限（默认 `2` 次）。
 
 ---
 
@@ -223,6 +228,13 @@ abogus = signer.get_abogus(play_url, signer.user_agent)
   * 在 `_extract_best_url_from_play_addr` 中自动将 `/playwm/` 替换为 `/play/`；
   * 同时将参数中的 `ratio=720p` 自动提升为 `ratio=1080p`，实现直连 1080P 原始无水印纯净流。
 
+### 4.10 背景音乐与创作者原声提取（含下架原声双轨兜底）
+* **常规提取链路**：优先从作品的 `music.play_url.url_list` 或独立音乐页 (`/music/`) 的 `music_info.play_url.url_list` 提取首选 CDN 音频直链（MP3 格式）；
+* **下架原声双轨容灾兜底**：
+  * 当原声音频被平台限制或下架（`offline_desc: "该声音不可用"`、`filter_reason: "gov_takedown"`）时，常规 `play_url.url_list` 会被官方置空；
+  * 解析器内置 `_extract_audio_from_music` 智能双轨提取：自动解构 `music.extra` 中的 JSON 载荷，提取底层依然有效且带签名的 `original_song_url` / `original_sound_url` 直链；
+  * 若仍未获取到独立音轨，自动回退扫描视频流元数据中的分离音轨（如 `dynamicVideo.dynamic_audio_list`），确保音频提取的最大可用性。
+
 ---
 
 ## 5. 常见踩坑记录与风控解法 (Gotchas)
@@ -250,17 +262,24 @@ abogus = signer.get_abogus(play_url, signer.user_agent)
      4. **重试次数降为 2 次与极速降级**：Web 重试上限设为 2 次，遇到突发网络波动或未配置 Cookie 时，在 **<0.5 秒内极速降级至分享页 SSR**，确保静态高清原图毫秒级产出，不再阻塞等待；
      5. **兜底保障**：所有链路均配合终端状态（`_is_terminal_failure`）即时短路熔断机制。
 
-5. **私密/日常/已删除链接的不可重试终端状态与智能短路熔断**：
-   * *现象与机理*：用户传入“抖音日常（24小时可见）”、“私密（仅自己可见）”或“已被作者删除”的作品链接时，官方 Web 详情接口返回 HTTP 200，但带有 `filter_detail`（如 `status_self_see`、`status_deleted`、`status_part_see`）。此类作品本身已被平台限制访问，无论重试多少次都不会有数据。
-   * *旧版弊端*：若将此类 HTTP 200 的空响应视同为普通抓取失败，解析器会经历完整的 8 次指数退避重试以及 SSR HTML 兜底，导致单个失效链接耗时高达 11~14 秒，严重消耗并发连接池，且因统一返回模糊的 `MEDIA_NOT_FOUND`，容易诱导用户误判系统故障而反复狂刷重试。
-   * *解法与收益*：
-     1. **终端状态即时短路**：在 `_is_terminal_failure` 中精确识别 `filter_detail` 与不可恢复业务语义，命中后立即终止重试，跳过无意义的 8 次循环及 SSR 兜底；
-     2. **耗时断崖式下降**：将失效链接的处理耗时从 **11.3 秒压缩至 ~2 秒**（主要仅包含基础 302 跳转与单次 Web API 判定）；
-     3. **精准原因透传**：将官方返回的限制文案（如 `因作品权限或已被删除，无法观看，去看看其他作品吧`）通过 `retdesc` 准确反馈给调用端与终端用户，彻底杜绝无意义的重试刷量。
+5. **私密/日常/已删除链接的不可重试终端状态与刚发布审核中智能判别**：
+   * *现象与机理*：用户传入“抖音日常（24小时可见）”、“私密（仅自己可见）”或“已被作者删除”的作品链接时，官方 Web 详情接口返回 HTTP 200，但带有 `filter_detail`（如 `status_self_see`、`status_deleted`、`status_part_see`）。此类作品通常已被平台限制访问。
+   * *刚发布审核中（`status_self_see` 动态识别）*：
+     * **平台特殊机制**：抖音创作者刚发布的新作品在平台审核通过前，接口会统一临时返回 `status_self_see`（仅自己可见），几分钟审核完毕后即可正常公开解析。
+     * **时间戳逆向解算**：抖音 `aweme_id` 采用雪花/时间戳 ID 生成算法，**高 32 位为秒级发布时间戳**（`int(aweme_id) >> 32`）。
+     * **精准区分与可重试透传**：当接口命中 `status_self_see` 时，解析器自动计算作品发布时长。若处于审核窗口期（由环境变量 `DOUYIN_UNDER_REVIEW_MAX_AGE` 控制，默认 7200 秒 / 2 小时），则将其标记为 `MEDIA_UNDER_REVIEW` 并返回提示文案 *“该作品刚发布，正在抖音审核中，暂时无法查看，请几分钟后重试”*，供调用端与用户稍后重试，避免被误判为永久删除或私密。
+   * *真正终态短路熔断*：
+     * 超过审核时限仍为 `status_self_see`、或命中 `status_deleted` / `status_part_see` 等状态时，立即判定为不可恢复的终端状态；
+     * **终端状态即时短路**：在 `_is_terminal_failure` 中精确识别 `filter_detail` 与不可恢复业务语义，命中后立即终止重试，跳过无意义的 8 次循环及 SSR 兜底；
+     * **耗时断崖式下降**：将失效链接的处理耗时从 **11.3 秒压缩至 ~2 秒**（主要仅包含基础 302 跳转与单次 Web API 判定）；
+     * **精准原因透传**：将官方返回的限制文案（如 `因作品权限或已被删除，无法观看，去看看其他作品吧`）通过 `retdesc` 准确反馈给调用端与终端用户，彻底杜绝无意义的重试刷量。
 
 6. **分享页 SSR 兜底数据下发 `playwm` 带水印端点**：
    * *现象*：部分未收录于 Feed 推荐流的视频在走移动端分享页 SSR 降级时，SSR `_ROUTER_DATA` 中仅包含 `video.play_addr` 且地址形式为 `/aweme/v1/playwm/?...`（720P 带片头作者水印与片尾抖音 Logo）。
    * *解法*：解析器在提取播放地址时，统一将 `/playwm/` 路径自动转换为 `/play/`，并同步将 `ratio=720p` 改写为 `ratio=1080p`，保证在任何兜底场景下输出的均为 1080P 真正无水印原画视频。
+7. **创作者原声被限制/下架（「该声音不可用」/ `gov_takedown`）导致常规音频字段置空**：
+   * *现象与机理*：部分时政新闻媒体作品、违规或版权受限的原声在平台被设为“该声音不可用”，禁止被引用为公共声音模板。此时官方接口将常规播放列表 `music.play_url.url_list` 设为 `null` 或空列表，导致单一依赖该字段的解析器无法获取到音频。
+   * *解法*：解析器内置了下架原声动态签名直链容灾提取。当常规 `url_list` 为空时，自动解构 `music.extra` 中的 JSON 数据，从中提取底层依然可正常请求的动态签名原声直链 `original_song_url`，并兜底支持 `dynamic_video.dynamic_audio_list` 分离音轨，实现 100% 提取可用原声。
 
 ---
 

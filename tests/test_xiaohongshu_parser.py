@@ -96,7 +96,7 @@ class XiaohongshuParserTest(unittest.TestCase):
         resp.text = '<script>window.__INITIAL_STATE__ = {"note": {"firstNoteId": "123", "noteDetailMap": {"123": {"note": {"title": "带Cookie标题", "imageList": []}}}}}</script>'
 
         with patch("requests.Session.get", return_value=resp) as mock_get:
-            with patch.dict(os.environ, {"XHS_COOKIE": "a1=test_cookie_value;"}):
+            with patch.dict(os.environ, {"XIAOHONGSHU_COOKIE": "a1=test_cookie_value;", "XHS_COOKIE": ""}):
                 parser = XiaohongshuParser("https://www.xiaohongshu.com/explore/123")
                 self.assertEqual(parser.get_title_content(), "带Cookie标题")
                 call_headers = mock_get.call_args[1]["headers"]
@@ -112,11 +112,37 @@ class XiaohongshuParserTest(unittest.TestCase):
         resp.text = '<html><head><title>登录</title></head></html>'
 
         with patch("requests.Session.get", return_value=resp):
-            with patch.dict(os.environ, {"XHS_COOKIE": ""}):
+            with patch.dict(os.environ, {"XIAOHONGSHU_COOKIE": "", "XHS_COOKIE": ""}):
                 parser = XiaohongshuParser("https://www.xiaohongshu.com/explore/456")
                 self.assertIsNotNone(parser.terminal_error)
                 self.assertIn("需在后台系统设置中配置小红书 Cookie", parser.terminal_error["detail_msg"])
 
+
+    def _parser_for_final_url(self, final_url):
+        from unittest.mock import Mock, patch
+        import os
+        resp = Mock(status_code=200, url=final_url, text="<html></html>")
+        with patch("requests.Session.get", return_value=resp):
+            with patch.dict(os.environ, {"XIAOHONGSHU_COOKIE": "", "XHS_COOKIE": ""}):
+                return XiaohongshuParser("https://www.xiaohongshu.com/discovery/item/69fc84830000000023016c37")
+
+    def test_security_404_is_risk_control_not_deleted(self):
+        parser = self._parser_for_final_url(
+            "https://www.xiaohongshu.com/404?source=/404/sec_mRapqfwO?redirectPath=x&error_code=300031&error_msg=x"
+        )
+        self.assertEqual(parser.terminal_error["error_code"], "XIAOHONGSHU_COOKIE_REQUIRED")
+        self.assertIn("风控", parser.terminal_error["detail_msg"])
+
+    def test_mobile_security_404_is_risk_control(self):
+        parser = self._parser_for_final_url(
+            "https://www.xiaohongshu.com/404/sec_dgXCGSbw?source=xhs_sec_server&originalUrl=x"
+        )
+        self.assertEqual(parser.terminal_error["error_code"], "XIAOHONGSHU_COOKIE_REQUIRED")
+
+    def test_plain_404_is_still_deleted(self):
+        parser = self._parser_for_final_url("https://www.xiaohongshu.com/404?source=note")
+        self.assertNotIn("error_code", parser.terminal_error)
+        self.assertIn("删除", parser.terminal_error["detail_msg"])
 
 if __name__ == "__main__":
     unittest.main()
